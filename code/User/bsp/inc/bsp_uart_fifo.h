@@ -37,7 +37,7 @@
 	【串口4】 --- 不做串口用。
 	【串口5】 --- 不做串口用。
 */
-#define	UART1_FIFO_EN	1
+#define	UART1_FIFO_EN	0
 #define	UART2_FIFO_EN	1
 #define	UART3_FIFO_EN	1
 #define	UART4_FIFO_EN	1
