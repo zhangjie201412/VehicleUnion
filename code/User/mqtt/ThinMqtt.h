@@ -6,26 +6,11 @@
 
 #define bool uint8_t
 
-#define BUFFER_MAX      1024
-#define ID_MAX          32
+void vTaskMqttProcess(void *pvParameters);
 
-typedef struct {
-    char id[ID_MAX];
-    int32_t  status;
-    char buffer[BUFFER_MAX];
-    //register callback function
-    int (*mqtt_read)(char *, int);
-    int (*mqtt_write)(char *, int);
-} ThinMqttClient;
-
-void thin_mqtt_init();
-void thin_mqtt_release();
-bool thin_mqtt_connect(ThinMqttClient *client);
-bool thin_mqtt_disconnect(ThinMqttClient *client);
-bool thin_mqtt_ping(ThinMqttClient *client);
-bool thin_mqtt_publish(ThinMqttClient *client, const char *topic,
-        const char *message);
-bool thin_mqtt_subscribe(ThinMqttClient *client, const char *topic);
+void thin_mqtt_init(void);
+void thin_mqtt_release(void);
+bool thin_mqtt_publish(const char *id, const char *topic, const char *message);
 
 
 #endif

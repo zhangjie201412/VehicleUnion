@@ -23,7 +23,10 @@ void kwp2000_InitGpio(void);
 void kwp2000_InitUart(void);
 void kwp2000_SendBuf(uint8_t *buf, uint16_t len);
 void kwp2000_SendChar(uint8_t byte);
-void kwp2000_ClearTx(void);
-void kwp2000_ClearRx(void);
+uint8_t kwp2000_GetChar(uint8_t *_pByte);
+void kwp2000_ClearRxFifo(void);
+void kwp2000_ClearTxFifo(void);
+
+void kwp2000_sample(void);
 
 #endif

@@ -5,6 +5,11 @@
 #include "m25pxx.h"
 #include "flash_table.h"
 #include "ThinMqtt.h"
+#include "l206.h"
+#include "led.h"
+
+#include "kwp2000.h"
+#include "can.h"
 
 char *logo_text =
 "+++++++++++++++++++++++++++++++++++++++++++\r\n"
@@ -13,8 +18,7 @@ char *logo_text =
 "+             V2018.0226.01               +\r\n"
 "+                                         +\r\n"
 "+++++++++++++++++++++++++++++++++++++++++++\r\n"
-"This is app!!\r\n";
-
+;
 /*
  **********************************************************************************************************
  函数声明
@@ -31,6 +35,18 @@ static void AppTaskCreate (void);
  **********************************************************************************************************
  */
 static TaskHandle_t xHandleTaskStart = NULL;
+static TaskHandle_t xHandleTaskL206Process = NULL;
+static TaskHandle_t xHandleTaskMqttProcess = NULL;
+static TaskHandle_t xHandleTaskLedProcess = NULL;
+
+#define TASK_L206_PRIO      8
+#define TASK_MQTT_PRIO      6
+#define TASK_LED_PRIO       9
+
+#define TASK_L206_STACK     2048
+#define TASK_MQTT_STACK     2048
+#define TASK_LED_STACK      256
+
 static TaskHandle_t xHandleTaskFlashTest = NULL;
 
 /*
@@ -82,15 +98,29 @@ int main(void)
  */
 static void vTaskStart(void *pvParameters)
 {
-    char buf2[4];
-    int total = 1024;
-
     drivers_init();
     l206_init();
-    thin_mqtt_init();
+
+    xTaskCreate(vTaskL206Process,
+            "L206Process",
+            2048,
+            NULL,
+            8,
+            &xHandleTaskL206Process);
+    xTaskCreate(vTaskMqttProcess,
+            "MqttProcess",
+            2048,
+            NULL,
+            6,
+            &xHandleTaskMqttProcess);
     while(1)
     {
-        os_delay_ms(2000);
+        os_delay(10);
+        logi("...");
+        //can_sample();
+        //kwp2000_sample();
+        //comClearRxFifo(COM1);
+        //comSendBuf(COM1, "hello", 5);
     }
 }
 
@@ -127,13 +157,27 @@ static void vTaskFlashTest(void *pvParameters)
  */
 static void AppTaskCreate (void)
 {
-    xTaskCreate( vTaskStart,     		/* 任务函数  */
+    drivers_init();
+    xTaskCreate(vTaskL206Process,
+            "L206Process",
+            TASK_L206_STACK,
+            NULL,
+            TASK_L206_PRIO,
+            &xHandleTaskL206Process);
+    xTaskCreate(vTaskMqttProcess,
+            "MqttProcess",
+            TASK_MQTT_STACK,
+            NULL,
+            TASK_MQTT_PRIO,
+            &xHandleTaskMqttProcess);
+
+#if 0
+    xTaskCreate(vTaskStart,     		/* 任务函数  */
             "vTaskStart",   		/* 任务名    */
             512,            		/* 任务栈大小，单位word，也就是4字节 */
             NULL,           		/* 任务参数  */
-            4,              		/* 任务优先级*/
+            9,              		/* 任务优先级*/
             &xHandleTaskStart );   /* 任务句柄  */
-#if 0
     xTaskCreate( vTaskFlashTest,     		/* 任务函数  */
             "vTaskFlashTest",   		/* 任务名    */
             512,            		/* 任务栈大小，单位word，也就是4字节 */

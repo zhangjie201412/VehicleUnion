@@ -1,5 +1,5 @@
 #include "l206.h"
-#include "flash_table.h"
+#include "led.h"
 
 // connect sequence:
 //      ATE0
@@ -34,21 +34,20 @@
 #define RESET_0()               GPIO_ResetBits(RESET_PORT, RESET_PIN)
 #define RESET_1()               GPIO_SetBits(RESET_PORT, RESET_PIN)
 
-static void vTaskL206Process(void *pvParameters);
-
 static SemaphoreHandle_t xMutex = NULL;
 static char l206_imei[15];
 static char iccid[16];
-static TaskHandle_t xHandleTaskL206Process = NULL;
 static uint8_t mConnected = FALSE;
 
-static void vTaskL206Process(void *pvParameters)
+void vTaskL206Process(void *pvParameters)
 {
     uint8_t u_data;
     char buffer[100];
     int size;
 
     logi("%s: E", __func__);
+    l206_init();
+
     if(l206_poweron() == TRUE) {
         logi("%s: poweron successfully", __func__);
     } else {
@@ -63,8 +62,6 @@ static void vTaskL206Process(void *pvParameters)
     l206_iccid();
     l206_creg();
     l206_cgatt();
-
-    flash_table_init();
 
 #if 0
     l206_ftp_config("test.txt");
@@ -81,11 +78,12 @@ static void vTaskL206Process(void *pvParameters)
 
     if(l206_connect("139.224.227.174", 1884)) {
         logi("connect socket server successfully!!");
+        led_On();
         mConnected = TRUE;
     } else {
+        led_Off();
         loge("connect socket server failed!!");
         mConnected = FALSE;
-        return;
     }
 
     while(1) {
@@ -94,7 +92,7 @@ static void vTaskL206Process(void *pvParameters)
              printf("%c", u_data);
         }
 #endif
-        os_delay_ms(10);
+        os_delay(10);
         //l206_send("hello\n", 6, 5000);
         // l206_send("hello\n", 6);
         // memset(buffer, 0x00, 100);
@@ -125,17 +123,6 @@ void l206_init(void)
     if(xMutex == NULL) {
         loge("%s: failed to create mutex for l206", __func__);
     }
-
-    //create l206 process task
-    logi("create l206 process task");
-    xTaskCreate(vTaskL206Process,
-            "L206Process",
-            512,
-            NULL,
-            4,
-            &xHandleTaskL206Process);
-
-    logi("%s done", __func__);
 }
 
 void l206_reset(void)
@@ -225,36 +212,43 @@ void l206_set_baudrate(void)
 {
     comClearRxFifo(COM_L206);
     l206_write("AT+IPR=115200\r\n");
-    if(l206_wait_rsp("OK", 200)) {
+    if(l206_wait_rsp("OK", 1000)) {
         logi("%s: set baudrate success", __func__);
     } else {
         loge("%s: set baudrate failed", __func__);
     }
+    comClearTxFifo(COM_L206);
+    comClearRxFifo(COM_L206);
 }
 
 void l206_iccid(void)
 {
-    char buf[20];
+    char buf[40];
     uint8_t i;
     uint8_t offset;
 
     memset(buf, 0x00, 20);
     memset(iccid, 0x00, 15);
     comClearRxFifo(COM_L206);
+    comClearTxFifo(COM_L206);
     l206_write("AT+ICCID\r\n");
-    if(l206_read_rsp("OK", buf, 200)) {
+    if(l206_read_rsp("OK", buf, 1000)) {
         logi("%s: check device iccid success", __func__);
     } else {
         loge("%s: check device iccid failed", __func__);
     }
 
-    for(i = 0; i < 20; i++) {
+    logi("buf: %s", buf);
+    for(i = 0; i < 40; i++) {
+        printf("%02x ", buf[i]);
         if(is_digital(buf[i])) {
             offset = i;
             break;
         }
     }
-    if(i < 5) {
+    printf("\r\n");
+    logi("%s: i = %d", __func__, i);
+    if(i < 20) {
         memcpy(iccid, buf + offset, 15);
         iccid[15] = '\0';
     }
@@ -674,7 +668,14 @@ void l206_write(char *buf)
 {
     comClearRxFifo(COM_L206);
     comSendBuf(COM_L206, (uint8_t *)buf, strlen(buf));
-    logi("-> %s", buf);
+    if(!l206_is_connected()) {
+        led_Blink();
+        logi("-> %s", buf);
+    } else {
+        led_Toggle();
+        os_delay_ms(50);
+        led_Toggle();
+    }
 }
 
 uint8_t l206_wait_rsp(char *ack, uint16_t timeout_ms)

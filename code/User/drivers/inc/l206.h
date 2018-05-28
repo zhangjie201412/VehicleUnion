@@ -5,6 +5,8 @@
 
 #define COM_L206        COM3
 
+void vTaskL206Process(void *pvParameters);
+
 void l206_init(void);
 uint8_t l206_poweron(void);
 void l206_poweroff(void);

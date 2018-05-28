@@ -1,5 +1,6 @@
 #include "bsp.h"
 #include "kwp2000.h"
+#include "drivers.h"
 
 static USART_T g_Usart;
 static uint8_t g_TxBuf[KWP2000_TX_BUF_SIZE];
@@ -13,6 +14,32 @@ static void kwp2000_UartIRQ(USART_T *_pUart);
 static void kwp2000_ConfigUartNVIC(void);
 
 static void kwp2000_active(void);
+
+void kwp2000_sample(void)
+{
+    uint8_t send_cmd[5] = {0x81, 0x2a, 0xf0, 0x81, 0x1c};
+    uint8_t ret;
+    uint8_t u_data;
+
+    logi("%s: E", __func__);
+    kwp2000_InitGpio();
+    kwp2000_active();
+    kwp2000_InitUart();
+    kwp2000_ClearRxFifo();
+    kwp2000_ClearTxFifo();
+    kwp2000_SendBuf(send_cmd, 5); 
+
+    os_delay(1);
+    while(TRUE) {
+        ret = kwp2000_GetChar(&u_data);
+        if(ret == 0) {
+            break;
+        } else {
+            logi("%02x", u_data);
+        }
+    }
+    logi("%s: X", __func__);
+}
 
 void kwp2000_InitGpio(void)
 {

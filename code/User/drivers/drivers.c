@@ -1,9 +1,11 @@
 #include "drivers.h"
+#include "led.h"
 
 void drivers_init(void)
 {
     uint32_t flashId;
 
+    led_Init();
     M25PXX_Init();
     flashId = M25PXX_ReadID();
     logi("%s: read flash id %x", __func__, flashId);
