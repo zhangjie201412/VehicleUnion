@@ -6,6 +6,14 @@
 
 #define bool uint8_t
 
+extern QueueHandle_t xMqttQueue;
+
+typedef struct __MqttMsg {
+    char id[16];
+    char topic[128];
+    char message[128];
+} MqttMsg;
+
 void vTaskMqttProcess(void *pvParameters);
 
 void thin_mqtt_init(void);

@@ -4,9 +4,10 @@
 #include "drivers.h"
 #include "m25pxx.h"
 #include "flash_table.h"
-#include "ThinMqtt.h"
 #include "l206.h"
-#include "led.h"
+#include "ThinMqtt.h"
+#include "process.h"
+#include "gps.h"
 
 #include "kwp2000.h"
 #include "can.h"
@@ -37,15 +38,18 @@ static void AppTaskCreate (void);
 static TaskHandle_t xHandleTaskStart = NULL;
 static TaskHandle_t xHandleTaskL206Process = NULL;
 static TaskHandle_t xHandleTaskMqttProcess = NULL;
-static TaskHandle_t xHandleTaskLedProcess = NULL;
+static TaskHandle_t xHandleTaskProcess = NULL;
+static TaskHandle_t xHandleTaskGpsProcess = NULL;
 
-#define TASK_L206_PRIO      8
-#define TASK_MQTT_PRIO      6
-#define TASK_LED_PRIO       9
+#define TASK_L206_PRIO      1
+#define TASK_MQTT_PRIO      1
+#define TASK_PROCESS_PRIO   4
+#define TASK_GPS_PRIO       1
 
-#define TASK_L206_STACK     2048
-#define TASK_MQTT_STACK     2048
-#define TASK_LED_STACK      256
+#define TASK_L206_STACK         256
+#define TASK_MQTT_STACK         1024
+#define TASK_PROCESS_STACK      1024
+#define TASK_GPS_STACK          512
 
 static TaskHandle_t xHandleTaskFlashTest = NULL;
 
@@ -158,6 +162,21 @@ static void vTaskFlashTest(void *pvParameters)
 static void AppTaskCreate (void)
 {
     drivers_init();
+#if 1
+    xTaskCreate(vTaskProcessTask,
+            "ProcessTask",
+            TASK_PROCESS_STACK,
+            NULL,
+            TASK_PROCESS_PRIO,
+            &xHandleTaskProcess);
+#endif
+#if 1
+    xTaskCreate(vTaskGpsProcess,
+            "GpsProcess",
+            TASK_GPS_STACK,
+            NULL,
+            TASK_GPS_PRIO,
+            &xHandleTaskGpsProcess);
     xTaskCreate(vTaskL206Process,
             "L206Process",
             TASK_L206_STACK,
@@ -170,6 +189,7 @@ static void AppTaskCreate (void)
             NULL,
             TASK_MQTT_PRIO,
             &xHandleTaskMqttProcess);
+#endif
 
 #if 0
     xTaskCreate(vTaskStart,     		/* ÈÎÎñº¯Êý  */

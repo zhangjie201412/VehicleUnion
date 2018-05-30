@@ -39,6 +39,31 @@ static char l206_imei[15];
 static char iccid[16];
 static uint8_t mConnected = FALSE;
 
+void l206_reset(void);
+
+static uint8_t l206_do_connect(const char *host, uint32_t port)
+{
+    uint8_t ret = FALSE;
+
+    l206_set_baudrate();
+    l206_cgmr();
+    l206_cgsn();
+    l206_cpin();
+    l206_iccid();
+    l206_creg();
+    l206_cgatt();
+
+    if(l206_connect("139.224.227.174", 1884)) {
+        logi("connect socket server successfully!!");
+        ret = TRUE;
+    } else {
+        loge("connect socket server failed!!");
+        ret = FALSE;
+    }
+
+    return ret;
+}
+
 void vTaskL206Process(void *pvParameters)
 {
     uint8_t u_data;
@@ -48,20 +73,25 @@ void vTaskL206Process(void *pvParameters)
     logi("%s: E", __func__);
     l206_init();
 
-    if(l206_poweron() == TRUE) {
-        logi("%s: poweron successfully", __func__);
-    } else {
-        loge("%s: poweron failed", __func__);
-        return;
-    }
+    mConnected = FALSE;
+    while(!mConnected) {
+        if(l206_poweron() == TRUE) {
+            logi("%s: poweron successfully", __func__);
+        } else {
+            loge("%s: poweron failed", __func__);
+            continue;
+        }
 
-    l206_set_baudrate();
-    l206_cgmr();
-    l206_cgsn();
-    l206_cpin();
-    l206_iccid();
-    l206_creg();
-    l206_cgatt();
+        if(l206_do_connect("139.224.227.174", 1884) == TRUE) {
+            led_On();
+            mConnected = TRUE;
+        } else {
+            led_Off();
+            mConnected = FALSE;
+            l206_poweroff();
+            l206_reset();
+        }
+    }
 
 #if 0
     l206_ftp_config("test.txt");
@@ -76,29 +106,8 @@ void vTaskL206Process(void *pvParameters)
     }
 #endif
 
-    if(l206_connect("139.224.227.174", 1884)) {
-        logi("connect socket server successfully!!");
-        led_On();
-        mConnected = TRUE;
-    } else {
-        led_Off();
-        loge("connect socket server failed!!");
-        mConnected = FALSE;
-    }
-
     while(1) {
-#if 0
-        while(comGetChar(COM_L206, &u_data)) {
-             printf("%c", u_data);
-        }
-#endif
         os_delay(10);
-        //l206_send("hello\n", 6, 5000);
-        // l206_send("hello\n", 6);
-        // memset(buffer, 0x00, 100);
-        // logi("start t o read");
-        // size = FreeRTOS_read(NULL, buffer, 100, 1000);
-        // logi("read %d bytes: %s", size, buffer);
     }
 }
 
@@ -397,7 +406,7 @@ uint8_t l206_ftp_get_file(char *buf)
         if(tmp != NULL) {
             is_last = TRUE;
         }
-        
+
         //1. get buffer size: +FTPGET: 2,512
         tmp = strstr(buffer, "+FTPGET: 2");
         if(tmp == NULL) {
@@ -589,6 +598,8 @@ uint8_t l206_send(uint8_t *buf, uint16_t len, int timeout)
     for(i = 0; i < len; i++) {
         index += snprintf((char *)tx_buf + index, 1024, "%02x", buf[i]);
     }
+    comClearRxFifo(COM_L206);
+    comClearTxFifo(COM_L206);
     l206_write((char *)tx_buf);
     l206_write("\r\n");
     if(l206_wait_rsp("SEND OK", timeout)) {
@@ -604,15 +615,32 @@ uint8_t l206_send(uint8_t *buf, uint16_t len, int timeout)
     return ret;
 }
 
-uint8_t l206_recv(uint8_t *buf, uint16_t *len, int timeout)
+uint16_t l206_recv(uint8_t *buf, uint16_t len, int timeout)
 {
-    uint8_t ret = FALSE;
+    uint8_t u_data;
+    uint16_t bytes = 0;
+    uint8_t u_rx_buf[100];
+    TickType_t xTicksToWait = timeout / portTICK_PERIOD_MS;
+    TimeOut_t xTimeOut;
 
     l206_lock();
+    vTaskSetTimeOutState(&xTimeOut);
+    do {
+        if(comGetChar(COM_L206, &u_data)) {
+            //printf("%c", u_data);
+            u_rx_buf[bytes ++] = u_data;
+            if(bytes >= len) {
+                break;
+            }
+        }
+    } while(xTaskCheckForTimeOut(&xTimeOut, &xTicksToWait) == pdFALSE);
+    if(bytes > 0) {
+        memcpy(buf, u_rx_buf, bytes);
+    }
 
     l206_unlock();
 
-    return ret;
+    return bytes;
 }
 
 uint8_t l206_connect(const char *host, uint32_t port)
@@ -631,6 +659,8 @@ uint8_t l206_connect(const char *host, uint32_t port)
         goto ERR_CONNECT;
     }
 
+    comClearRxFifo(COM_L206);
+    comClearTxFifo(COM_L206);
     l206_write("AT+ZIPCALL=1\r\n");
     if(l206_wait_rsp("OK", 5000)) {
         logi("%s: zipcall success", __func__);
@@ -683,7 +713,7 @@ uint8_t l206_wait_rsp(char *ack, uint16_t timeout_ms)
     uint8_t u_data;
     uint16_t pos = 0;
     uint32_t len = 0;
-    uint8_t ret;
+    uint8_t ret = 0;
     uint8_t u_rx_buf[100];
     TickType_t xTicksToWait = timeout_ms / portTICK_PERIOD_MS;
     TimeOut_t xTimeOut;
@@ -701,6 +731,7 @@ uint8_t l206_wait_rsp(char *ack, uint16_t timeout_ms)
                 //logi("rx_buf = %s, len = %d", u_rx_buf, len);
                 if(pos > 0) {
                     if(memcmp(u_rx_buf, ack, len) == 0) {
+                        //logi("u_rx_buf: %s", u_rx_buf);
                         ret = 1;
                         break;
                     } else {
@@ -754,6 +785,11 @@ uint16_t l206_read_rsp(char *ack, char *data, uint16_t timeout_ms)
             }
         }
     } while(xTaskCheckForTimeOut(&xTimeOut, &xTicksToWait) == pdFALSE);
+
+    //flush the buffer
+    while(comGetChar(COM_L206, &u_data)) {
+        ;
+    }
     //resume task
     // if(mConnected) {
     //     OSTaskResume(&L206TaskTCB, &err);

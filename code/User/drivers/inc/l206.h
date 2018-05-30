@@ -23,7 +23,7 @@ uint8_t l206_ftp_config(const char *filename);
 uint8_t l206_ftp_get_file(char *buf);
 //send buf to server by tcp socket
 uint8_t l206_send(uint8_t *buf, uint16_t len, int timeout);
-uint8_t l206_recv(uint8_t *buf, uint16_t *len, int timeout);
+uint16_t l206_recv(uint8_t *buf, uint16_t len, int timeout);
 //connect to remote server
 uint8_t l206_connect(const char *host, uint32_t port);
 uint8_t l206_wait_rsp(char *ack, uint16_t timeout);

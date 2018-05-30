@@ -392,6 +392,11 @@
               <FileType>5</FileType>
               <FilePath>..\..\User\FreeRTOSConfig.h</FilePath>
             </File>
+            <File>
+              <FileName>process.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\User\process.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -596,6 +601,16 @@
               <FileName>led.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\User\drivers\src\led.c</FilePath>
+            </File>
+            <File>
+              <FileName>misc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\User\drivers\misc.c</FilePath>
+            </File>
+            <File>
+              <FileName>gps.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\User\drivers\src\gps.c</FilePath>
             </File>
           </Files>
         </Group>
